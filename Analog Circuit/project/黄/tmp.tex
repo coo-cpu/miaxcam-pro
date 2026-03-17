@@ -1,0 +1,120 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- UNIVERSAL PREAMBLE BLOCK ---
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
+\usepackage{fontspec}
+
+\usepackage[english, bidi=basic, provide=*]{babel}
+
+\babelprovide[import, onchar=ids fonts]{english}
+
+% Set default/Latin font to Sans Serif in the main (rm) slot
+\babelfont{rm}{Noto Sans}
+
+% Packages for math and circuits
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{circuitikz}
+
+\title{Functional Derivation of R-2R Ladder DAC Operation}
+\author{Functional Analysis}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document details the mathematical derivation of the R-2R ladder Digital-to-Analog Converter (DAC). Unlike weighted-resistor architectures, the R-2R ladder utilizes a repeating structure of only two resistor values ($R$ and $2R$) to achieve binary-weighted currents. This derivation analyzes the circuit in \textbf{Current Mode}, where the ladder network is terminated at the virtual ground of an Operational Transconductance Amplifier (OTA) or Operational Amplifier.
+
+\section{Circuit Analysis}
+
+\subsection{Equivalent Resistance Property}
+The fundamental operation of the R-2R ladder relies on the property that the equivalent resistance looking to the right of any node in the ladder is exactly $2R$. We can prove this recursively starting from the Least Significant Bit (LSB).
+
+Consider an $N$-bit ladder. Let $R_{eq, k}$ be the equivalent resistance looking to the right from node $k$ (where $k=0$ is the LSB and $k=N-1$ is the MSB).
+
+\begin{enumerate}
+    \item \textbf{Base Case (LSB):}
+    At the LSB end, the ladder is terminated by a $2R$ resistor to ground. The LSB branch itself is also a $2R$ resistor. Looking from the node immediately to the left of the LSB, we see two $2R$ resistors in parallel:
+    \begin{equation}
+        R_{eq, 0} = 2R \parallel 2R = \frac{2R \times 2R}{2R + 2R} = R
+    \end{equation}
+    
+    \item \textbf{Inductive Step:}
+    Moving one stage to the left (towards the MSB), the equivalent resistance $R_{eq, 0}$ (which is $R$) is in series with the horizontal resistor $R$. This series combination ($R + R = 2R$) is then in parallel with the vertical branch resistor of the current bit ($2R$).
+    
+    Therefore, for any node $k$, the equivalent resistance looking to the right is:
+    \begin{equation}
+        R_{node\_look\_right} = (R_{series} + R_{eq, k-1}) \parallel R_{branch}
+    \end{equation}
+    Substituting $R_{series}=R$ and $R_{branch}=2R$:
+    \begin{equation}
+        R_{node} = (R + R) \parallel 2R = 2R \parallel 2R = R
+    \end{equation}
+    
+    Thus, adding the series resistor $R$ restores the resistance seen by the previous node to $2R$. This proves that at every node $i$ along the backbone of the ladder, the equivalent resistance looking towards the LSB is always $2R$.
+\end{enumerate}
+
+\subsection{Current Division Principle}
+Since the resistance looking into the right of any node $i$ is $2R$, and the vertical branch resistor at node $i$ is also $2R$, the current $I_{in, i}$ flowing into node $i$ from the left splits equally between the vertical branch (the bit current) and the remainder of the ladder (to the right).
+
+Let $I_{ref}$ be the reference current entering the MSB node.
+\begin{itemize}
+    \item \textbf{MSB Current ($I_{N-1}$):} The current splits equally. Half goes to the MSB switch, half goes to the rest of the ladder.
+    \begin{equation}
+        I_{N-1} = \frac{I_{ref}}{2}
+    \end{equation}
+    \item \textbf{Second MSB Current ($I_{N-2}$):} The remaining $I_{ref}/2$ travels through the series resistor $R$ to the next node, where it splits again.
+    \begin{equation}
+        I_{N-2} = \frac{1}{2} \times \left( \frac{I_{ref}}{2} \right) = \frac{I_{ref}}{4}
+    \end{equation}
+\end{itemize}
+
+Generalizing for the $k$-th bit (where $k=0$ is LSB and $k=N-1$ is MSB), the branch current $I_k$ is:
+\begin{equation}
+    I_k = \frac{V_{ref}}{R_{total}} \cdot \frac{1}{2^{N-k}}
+\end{equation}
+Assuming the network is driven by a voltage reference $V_{ref}$ connected to the ladder input with total characteristic resistance $R$, the current contribution of the $i$-th bit (using 1-based indexing for standard formula consistency, $i=1$ is MSB) is:
+\begin{equation}
+    I_i = \frac{V_{ref}}{2R} \cdot \frac{1}{2^{i-1}}
+\end{equation}
+
+\section{Transfer Function Derivation}
+
+The total output current $I_{out}$ is the sum of the currents from all branches that are switched to the output line (logic '1'). Branches connected to ground (logic '0') do not contribute to $I_{out}$.
+
+Let $b_i$ be the digital input bit, where $b_i \in \{0, 1\}$. The total current is:
+\begin{equation}
+    I_{out} = \sum_{i=1}^{N} b_i \cdot I_i = \sum_{i=1}^{N} b_i \cdot \frac{V_{ref}}{2^i R}
+\end{equation}
+Factorizing common terms:
+\begin{equation}
+    I_{out} = \frac{V_{ref}}{R} \sum_{i=1}^{N} \frac{b_i}{2^i}
+\end{equation}
+
+In the specific implementation using a 5-Transistor OTA or Op-Amp with feedback resistor $R_F$, the output current is converted to a voltage. For an inverting configuration:
+\begin{equation}
+    V_{out} = - I_{out} \cdot R_F
+\end{equation}
+
+Substituting the expression for $I_{out}$:
+\begin{equation}
+    V_{out} = - R_F \left( \frac{V_{ref}}{R} \sum_{i=1}^{N} \frac{b_i}{2^i} \right) = - V_{ref} \frac{R_F}{R} \left( \frac{b_1}{2^1} + \frac{b_2}{2^2} + \dots + \frac{b_N}{2^N} \right)
+\end{equation}
+
+\section{Case Study: 3-Bit DAC}
+For the specific case of a 3-bit DAC ($N=3$), the equation expands to:
+\begin{equation}
+    V_{out} = - V_{ref} \frac{R_F}{R} \left( \frac{b_1}{2} + \frac{b_2}{4} + \frac{b_3}{8} \right)
+\end{equation}
+Where:
+\begin{itemize}
+    \item $b_1$ is the Most Significant Bit (MSB, $D_2$).
+    \item $b_2$ is the middle bit ($D_1$).
+    \item $b_3$ is the Least Significant Bit (LSB, $D_0$).
+\end{itemize}
+
+This confirms that the output voltage is a linear analog representation of the digital input word, scaled by the reference voltage and the gain factor $R_F/R$.
+
+\end{document}
